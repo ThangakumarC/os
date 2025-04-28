@@ -1,0 +1,367 @@
+// #define _WIN32_IE 0x0400
+// #include <windows.h>
+// #include <tlhelp32.h>
+// #include <psapi.h>
+// #include <commctrl.h>
+// #include <stdio.h>
+
+// #pragma comment(lib, "comctl32.lib")
+// #pragma comment(lib, "psapi.lib")
+
+// #define ID_REFRESH 1
+// #define ID_ENDTASK 2
+
+// HWND hListView;
+// DWORD pidList[1024];
+// int processCount = 0;
+
+// // Initialize common controls
+// void InitControls()
+// {
+//     InitCommonControls();
+// }
+
+// void AddColumn(HWND hwndLV, int iCol, LPCSTR text, int width)
+// {
+//     LVCOLUMN lvc = { 0 };
+//     lvc.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM;
+//     lvc.cx = width;
+//     lvc.pszText = (LPSTR)text;
+//     lvc.iSubItem = iCol;
+//     ListView_InsertColumn(hwndLV, iCol, &lvc);
+// }
+
+// void ListProcesses()
+// {
+//     ListView_DeleteAllItems(hListView);
+//     processCount = 0;
+
+//     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+//     if (hSnapshot == INVALID_HANDLE_VALUE) return;
+
+//     PROCESSENTRY32 pe;
+//     pe.dwSize = sizeof(PROCESSENTRY32);
+
+//     if (Process32First(hSnapshot, &pe)) {
+//         do {
+//             char szPID[32], szMemory[32], szThreads[32];
+//             sprintf(szPID, "%lu", pe.th32ProcessID);
+//             sprintf(szThreads, "%lu", pe.cntThreads);
+
+//             HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe.th32ProcessID);
+//             SIZE_T memUsage = 0;
+//             if (hProcess) {
+//                 PROCESS_MEMORY_COUNTERS pmc;
+//                 if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
+//                     memUsage = pmc.WorkingSetSize / 1024; // Convert to KB
+//                 }
+//                 CloseHandle(hProcess);
+//             }
+//             sprintf(szMemory, "%zu KB", memUsage);
+
+//             LVITEM lvi = { 0 };
+//             lvi.mask = LVIF_TEXT;
+//             lvi.iItem = processCount;
+//             lvi.iSubItem = 0;
+//             lvi.pszText = pe.szExeFile;
+//             ListView_InsertItem(hListView, &lvi);
+
+//             ListView_SetItemText(hListView, processCount, 1, szPID);
+//             ListView_SetItemText(hListView, processCount, 2, szMemory);
+//             ListView_SetItemText(hListView, processCount, 3, szThreads);
+
+//             pidList[processCount++] = pe.th32ProcessID;
+
+//         } while (Process32Next(hSnapshot, &pe));
+//     }
+
+//     CloseHandle(hSnapshot);
+// }
+
+// void KillSelectedProcess(HWND hwnd)
+// {
+//     int sel = ListView_GetNextItem(hListView, -1, LVNI_SELECTED);
+//     if (sel == -1 || sel >= processCount) return;
+
+//     DWORD pid = pidList[sel];
+
+//     HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+//     if (hProcess != NULL) {
+//         TerminateProcess(hProcess, 0);
+//         CloseHandle(hProcess);
+//         MessageBox(hwnd, "Process terminated.", "Success", MB_OK | MB_ICONINFORMATION);
+//         ListProcesses();
+//     } else {
+//         MessageBox(hwnd, "Failed to terminate process.", "Error", MB_OK | MB_ICONERROR);
+//     }
+// }
+
+// LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+// {
+//     switch (msg)
+//     {
+//         case WM_CREATE:
+//         {
+//             CreateWindow("BUTTON", "Refresh", WS_VISIBLE | WS_CHILD,
+//                 10, 10, 100, 30, hwnd, (HMENU)ID_REFRESH, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+//             CreateWindow("BUTTON", "End Task", WS_VISIBLE | WS_CHILD,
+//                 120, 10, 100, 30, hwnd, (HMENU)ID_ENDTASK, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+//             hListView = CreateWindow(WC_LISTVIEW, "",
+//                 WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
+//                 10, 50, 660, 400,
+//                 hwnd, NULL, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+//             if (hListView == NULL) {
+//                 MessageBox(hwnd, "Failed to create ListView.", "Error", MB_OK | MB_ICONERROR);
+//                 return -1;
+//             }
+
+//             ListView_SetExtendedListViewStyle(hListView, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+
+//             AddColumn(hListView, 0, "Name", 200);
+//             AddColumn(hListView, 1, "PID", 100);
+//             AddColumn(hListView, 2, "Memory Usage", 150);
+//             AddColumn(hListView, 3, "Threads", 100);
+
+//             ListProcesses();
+//             break;
+//         }
+
+//         case WM_COMMAND:
+//             switch (LOWORD(wParam))
+//             {
+//                 case ID_REFRESH:
+//                     ListProcesses();
+//                     break;
+//                 case ID_ENDTASK:
+//                     KillSelectedProcess(hwnd);
+//                     break;
+//             }
+//             break;
+
+//         case WM_DESTROY:
+//             PostQuitMessage(0);
+//             break;
+
+//         default:
+//             return DefWindowProc(hwnd, msg, wParam, lParam);
+//     }
+//     return 0;
+// }
+
+// int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
+// {
+//     WNDCLASS wc = { 0 };
+//     wc.lpfnWndProc = WndProc;
+//     wc.hInstance = hInst;
+//     wc.lpszClassName = "TaskManagerApp";
+//     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+//     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+//     InitControls();
+//     RegisterClass(&wc);
+
+//     HWND hwnd = CreateWindow("TaskManagerApp", "Advanced C Task Manager",
+//         WS_OVERLAPPEDWINDOW, 100, 100, 700, 520,
+//         NULL, NULL, hInst, NULL);
+
+//     if (hwnd == NULL) {
+//         MessageBox(NULL, "Window Creation Failed!", "Error", MB_OK | MB_ICONERROR);
+//         return 0;
+//     }
+
+//     ShowWindow(hwnd, nCmdShow);
+//     UpdateWindow(hwnd);
+
+//     MSG msg;
+//     while (GetMessage(&msg, NULL, 0, 0))
+//     {
+//         TranslateMessage(&msg);
+//         DispatchMessage(&msg);
+//     }
+
+//     return msg.wParam;
+// }
+
+
+// taskmgr.c
+#include <windows.h>
+#include <tlhelp32.h>
+#include <psapi.h>
+#include <commctrl.h>
+#include <stdio.h>
+
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "psapi.lib")
+
+#define ID_TABCTRL 1000
+#define ID_TIMER 1001
+#define ID_LISTVIEW 1002
+#define ID_GRAPH 1003
+
+HWND hTab, hListView, hGraph;
+int currentTab = 0;
+
+// CPU and Memory usage values
+float cpuUsage = 0.0f;
+float memoryUsage = 0.0f;
+
+// For live graph
+#define HISTORY_COUNT 60
+float cpuHistory[HISTORY_COUNT] = {0};
+float memoryHistory[HISTORY_COUNT] = {0};
+int historyIndex = 0;
+
+// Forward declarations
+LRESULT CALLBACK GraphWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Function to initialize the controls
+void InitControls() {
+    InitCommonControls();  // Initialize the common controls
+
+    // Create the tab control
+    hTab = CreateWindow(WC_TABCONTROL, "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, 0, 0, 600, 400, GetParent(hTab), (HMENU)ID_TABCTRL, GetModuleHandle(NULL), NULL);
+    if (hTab == NULL) {
+        MessageBox(NULL, "Failed to create Tab Control", "Error", MB_OK);
+        return;
+    }
+
+    // Add tabs to the tab control
+    TCITEM tie;
+    tie.mask = TCIF_TEXT;
+    tie.pszText = "CPU/Memory Graph";
+    TabCtrl_InsertItem(hTab, 0, &tie);
+    tie.pszText = "Task List";
+    TabCtrl_InsertItem(hTab, 1, &tie);
+
+    // Create the listview for tasks
+    hListView = CreateWindow(WC_LISTVIEW, "", WS_CHILD | WS_VISIBLE | LVS_REPORT, 0, 0, 600, 400, GetParent(hTab), (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
+
+    // Create the graph window
+    hGraph = CreateWindow("STATIC", "", WS_CHILD | WS_VISIBLE | SS_BLACKFRAME, 0, 0, 600, 400, GetParent(hTab), (HMENU)ID_GRAPH, GetModuleHandle(NULL), NULL);
+    SetWindowLongPtr(hGraph, GWLP_WNDPROC, (LONG_PTR)GraphWndProc);
+}
+
+// Function to update CPU and Memory usage (dummy data for now)
+void UpdateSystemStats() {
+    // This is dummy data for now. Replace with actual CPU/Memory usage code.
+    cpuUsage = rand() % 100;  // Random CPU usage for simulation
+    memoryUsage = rand() % 100;  // Random memory usage for simulation
+
+    // Update history for graph
+    cpuHistory[historyIndex] = cpuUsage;
+    memoryHistory[historyIndex] = memoryUsage;
+    historyIndex = (historyIndex + 1) % HISTORY_COUNT;
+}
+
+// Timer procedure to update the stats periodically
+void SetTimerCallback() {
+    SetTimer(hGraph, ID_TIMER, 1000, NULL);  // 1000ms = 1 second
+}
+
+void DrawGraph(HWND hwnd) {
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(hwnd, &ps);
+
+    RECT rect;
+    GetClientRect(hwnd, &rect);
+
+    FillRect(hdc, &rect, (HBRUSH)(COLOR_WINDOW + 1));
+
+    HPEN hPenCPU = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+    HPEN hPenMemory = CreatePen(PS_SOLID, 2, RGB(0, 0, 255));
+
+    int width = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+
+    // Draw CPU graph
+    SelectObject(hdc, hPenCPU);
+    MoveToEx(hdc, 0, height - (int)(cpuHistory[0] * height / 100.0f), NULL);
+    for (int i = 1; i < HISTORY_COUNT; i++) {
+        LineTo(hdc, i * width / HISTORY_COUNT, height - (int)(cpuHistory[i] * height / 100.0f));
+    }
+
+    // Draw Memory graph
+    SelectObject(hdc, hPenMemory);
+    MoveToEx(hdc, 0, height - (int)(memoryHistory[0] * height / 100.0f), NULL);
+    for (int i = 1; i < HISTORY_COUNT; i++) {
+        LineTo(hdc, i * width / HISTORY_COUNT, height - (int)(memoryHistory[i] * height / 100.0f));
+    }
+
+    DeleteObject(hPenCPU);
+    DeleteObject(hPenMemory);
+
+    EndPaint(hwnd, &ps);
+}
+
+// Main Window Procedure
+LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_CREATE:
+            InitControls();
+            SetTimerCallback();
+            break;
+        case WM_TIMER:
+            if (wParam == ID_TIMER) {
+                UpdateSystemStats();
+                InvalidateRect(hGraph, NULL, TRUE);  // Redraw the graph
+            }
+            break;
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case ID_TABCTRL:
+                    // Handle tab switch (not implemented here, could be added)
+                    break;
+            }
+            break;
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+// Graph Window Procedure (already defined above)
+LRESULT CALLBACK GraphWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_PAINT) {
+        DrawGraph(hwnd);
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+// Main entry point
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow) {
+    WNDCLASSEX wc = {0};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.lpfnWndProc = MainWndProc;
+    wc.hInstance = hInst;
+    wc.lpszClassName = "TaskMgrClass";
+    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    if (!RegisterClassEx(&wc)) {
+        MessageBox(NULL, "Window class registration failed!", "Error", MB_OK);
+        return 1;
+    }
+
+    HWND hwnd = CreateWindowEx(0, "TaskMgrClass", "Task Manager", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInst, NULL);
+    if (!hwnd) {
+        MessageBox(NULL, "Window creation failed!", "Error", MB_OK);
+        return 1;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return (int)msg.wParam;
+}
